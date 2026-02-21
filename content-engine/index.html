@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Engine — Santosh Shelar</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & ROOT ─────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0c0e0f;
+  --surface: #141618;
+  --surface2: #1c1f21;
+  --border: #2a2e32;
+  --border2: #363b40;
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --amber-glow: rgba(245,158,11,0.25);
+  --green: #10b981;
+  --green-dim: rgba(16,185,129,0.12);
+  --red: #ef4444;
+  --blue: #3b82f6;
+  --blue-dim: rgba(59,130,246,0.12);
+  --pink: #ec4899;
+  --pink-dim: rgba(236,72,153,0.12);
+  --text: #e8eaed;
+  --text2: #9aa0a8;
+  --text3: #5f6670;
+  --radius: 8px;
+  --radius-lg: 14px;
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Instrument Sans', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ─── BACKGROUND TEXTURE ──────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 800px 600px at 20% 0%, rgba(245,158,11,0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 400px at 80% 100%, rgba(59,130,246,0.03) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── LAYOUT ─────────────────────────────────── */
+.app-wrapper {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── TOPBAR ─────────────────────────────────── */
+.topbar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  height: 58px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(12,14,15,0.9);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+.logo-dot {
+  width: 28px; height: 28px;
+  background: var(--amber);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.model-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 5px 14px 5px 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--text3);
+  transition: background 0.3s;
+}
+.status-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.status-dot.error { background: var(--red); }
+
+.settings-btn {
+  width: 34px; height: 34px;
+  border-radius: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+.settings-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+/* ─── SIDEBAR ─────────────────────────────────── */
+.sidebar {
+  border-right: 1px solid var(--border);
+  padding: 28px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+}
+.sidebar-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 0 8px;
+  margin-bottom: 8px;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+  position: relative;
+}
+.step-item:not(.active):not(.done):not(.disabled) { color: var(--text3); }
+.step-item.disabled { opacity: 0.4; pointer-events: none; }
+.step-item.done { color: var(--text2); }
+.step-item.done .step-num { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+.step-item.active {
+  background: var(--amber-dim);
+  border-color: rgba(245,158,11,0.3);
+  color: var(--amber);
+}
+.step-item.active .step-num { background: var(--amber); color: var(--bg); border-color: var(--amber); }
+.step-num {
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  display: grid;
+  place-items: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+.step-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.step-sub {
+  font-size: 11px;
+  color: var(--text3);
+  line-height: 1;
+  margin-top: 2px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+
+.keyword-display {
+  margin-top: auto;
+  padding: 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.kd-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--text3);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.kd-value {
+  font-size: 13px;
+  color: var(--amber);
+  font-weight: 600;
+  word-break: break-word;
+}
+
+/* ─── MAIN CONTENT ───────────────────────────── */
+.main {
+  overflow-y: auto;
+  height: calc(100vh - 58px);
+}
+.panel {
+  display: none;
+  padding: 36px 40px;
+  max-width: 960px;
+  animation: fadeSlide 0.3s ease;
+}
+.panel.active { display: block; }
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── PANEL HEADER ───────────────────────────── */
+.panel-header { margin-bottom: 32px; }
+.panel-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-tag::before {
+  content: '';
+  display: inline-block;
+  width: 20px; height: 1px;
+  background: var(--amber);
+}
+.panel-header h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+.panel-header p {
+  color: var(--text2);
+  font-size: 14px;
+  max-width: 560px;
+  line-height: 1.7;
+}
+
+/* ─── FORM ELEMENTS ──────────────────────────── */
+.input-group {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 20px;
+}
+.keyword-input {
+  flex: 1;
+  background: var(--surface);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 16px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.keyword-input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-dim);
+}
+.keyword-input::placeholder { color: var(--text3); }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: var(--radius);
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary {
+  background: var(--amber);
+  color: #000;
+}
+.btn-primary:not(:disabled):hover {
+  background: #fbbf24;
+  box-shadow: 0 0 20px var(--amber-glow);
+  transform: translateY(-1px);
+}
+.btn-secondary {
+  background: var(--surface2);
+  border: 1.5px solid var(--border2);
+  color: var(--text);
+}
+.btn-secondary:not(:disabled):hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+.btn-ghost {
+  background: transparent;
+  border: 1.5px solid var(--border2);
+  color: var(--text2);
+  padding: 7px 14px;
+  font-size: 12px;
+}
+.btn-ghost:hover { border-color: var(--amber); color: var(--amber); }
+.btn-sm { padding: 7px 16px; font-size: 12px; }
+
+/* ─── TOPICS GRID ────────────────────────────── */
+.topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 4px;
+}
+.topic-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+.topic-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--border2);
+  transition: background 0.2s;
+}
+.topic-card:hover {
+  border-color: var(--amber);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+}
+.topic-card:hover::before { background: var(--amber); }
+.topic-card.selected {
+  border-color: var(--amber);
+  background: var(--amber-dim);
+}
+.topic-card.selected::before { background: var(--amber); }
+.topic-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+.topic-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.topic-why {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.topic-badge {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.badge-easy { background: var(--green-dim); color: var(--green); }
+.badge-medium { background: var(--amber-dim); color: var(--amber); }
+.badge-hard { background: var(--pink-dim); color: var(--pink); }
+
+/* ─── LOADING ────────────────────────────────── */
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 20px;
+  color: var(--text2);
+}
+.spinner {
+  width: 36px; height: 36px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--amber);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 2px;
+  color: var(--amber);
+  text-transform: uppercase;
+}
+.typing-dots::after {
+  content: '...';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60%, 100% { content: '...'; }
+}
+
+/* ─── ARTICLE DISPLAY ────────────────────────── */
+.article-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.article-toolbar-left {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.article-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 28px 32px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 480px;
+  overflow-y: auto;
+  font-family: 'Instrument Sans', sans-serif;
+}
+.article-box h1, .article-box h2, .article-box h3 {
+  font-family: 'Syne', sans-serif;
+  color: var(--text);
+  margin: 1.2em 0 0.5em;
+  line-height: 1.3;
+}
+.article-box::-webkit-scrollbar { width: 6px; }
+.article-box::-webkit-scrollbar-track { background: transparent; }
+.article-box::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+.streaming-cursor::after {
+  content: '▊';
+  color: var(--amber);
+  animation: blink 1s infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ─── PLATFORM TABS ──────────────────────────── */
+.platform-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+}
+.ptab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text3);
+  transition: all 0.2s;
+  border: 1.5px solid transparent;
+  white-space: nowrap;
+}
+.ptab:hover { color: var(--text2); background: var(--surface2); }
+.ptab.active { background: var(--surface2); border-color: var(--border2); color: var(--text); }
+.ptab.done::after { content: ' ✓'; color: var(--green); font-size: 11px; }
+.ptab[data-platform="twitter"].active { border-color: rgba(29,155,240,0.4); color: #1d9bf0; }
+.ptab[data-platform="linkedin"].active { border-color: rgba(10,102,194,0.4); color: #0a66c2; }
+.ptab[data-platform="pinterest"].active { border-color: rgba(230,0,35,0.4); color: #e60023; }
+.ptab[data-platform="youtube"].active { border-color: rgba(255,0,0,0.4); color: #ff0000; }
+
+.platform-panel { display: none; }
+.platform-panel.active { display: block; }
+
+/* ─── OUTPUT SECTIONS ────────────────────────── */
+.output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.output-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.platform-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+.icon-twitter { background: rgba(29,155,240,0.15); }
+.icon-linkedin { background: rgba(10,102,194,0.15); }
+.icon-pinterest { background: rgba(230,0,35,0.15); }
+.icon-youtube { background: rgba(255,0,0,0.15); }
+
+.generate-platform-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1.5px solid var(--border2);
+  background: var(--surface2);
+  color: var(--text);
+  transition: all 0.2s;
+}
+.generate-platform-btn:not(:disabled):hover {
+  border-color: var(--amber);
+  box-shadow: 0 0 12px var(--amber-dim);
+}
+.generate-platform-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Output cards */
+.output-cards { display: flex; flex-direction: column; gap: 14px; }
+.output-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.output-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+}
+.output-card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+.copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text3);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+}
+.copy-btn:hover { border-color: var(--amber); color: var(--amber); }
+.copy-btn.copied { border-color: var(--green); color: var(--green); }
+.output-card-body {
+  padding: 16px 18px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Pinterest specific */
+.pin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pin-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pin-header {
+  background: rgba(230,0,35,0.08);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.pin-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #e60023;
+  letter-spacing: 1px;
+}
+.pin-body {
+  padding: 14px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+.pin-section-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+.pin-section { margin-bottom: 10px; }
+
+/* ─── SETTINGS MODAL ─────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  place-items: center;
+}
+.modal-backdrop.open { display: grid; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  width: 420px;
+  max-width: 90vw;
+  animation: fadeSlide 0.2s ease;
+}
+.modal h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.modal-sub {
+  font-size: 13px;
+  color: var(--text2);
+  margin-bottom: 24px;
+}
+.form-group { margin-bottom: 18px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  margin-bottom: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+.form-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--amber); }
+.form-select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+.conn-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text2);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 18px;
+}
+
+/* ─── SCROLLBAR ──────────────────────────────── */
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-track { background: transparent; }
+.main::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ─── RESPONSIVE ─────────────────────────────── */
+@media (max-width: 768px) {
+  .app-wrapper { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .panel { padding: 24px 20px; }
+  .pin-grid { grid-template-columns: 1fr; }
+  .platform-tabs { flex-wrap: wrap; }
+}
+
+/* ─── HELPERS ────────────────────────────────── */
+.hidden { display: none !important; }
+.flex-gap { display: flex; gap: 10px; flex-wrap: wrap; }
+.word-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 8px;
+  text-align: right;
+}
+.progress-bar {
+  height: 2px;
+  background: var(--border);
+  border-radius: 1px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 1px;
+  transition: width 0.4s ease;
+}
+.error-box {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.3);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 13px;
+  color: #fca5a5;
+  margin-bottom: 16px;
+}
+</style>
+</head>
+<body>
+
+<div class="app-wrapper">
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-dot">⚡</div>
+      Content Engine
+    </div>
+    <div class="topbar-right">
+      <div class="model-badge">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="modelName">llama3.2</span>
+      </div>
+      <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-label">Workflow</div>
+
+    <div class="step-item active" id="nav-1" onclick="goToStep(1)">
+      <div class="step-num">1</div>
+      <div>
+        <div class="step-label">Keyword</div>
+        <div class="step-sub">Enter topic keyword</div>
+      </div>
+    </div>
+
+    <div class="step-item disabled" id="nav-2" onclick="goToStep(2)">
+      <div class="step-num">2</div>
+      <div>
+        <div class="step-label">Choose Topic</div>
+        <div class="step-sub">Pick from 10 ideas</div>
+      </div>
+    </div>
+
+    <div class="step-item disabled" id="nav-3" onclick="goToStep(3)">
+      <div class="step-num">3</div>
+      <div>
+        <div class="step-label">SEO Article</div>
+        <div class="step-sub">Full Medium article</div>
+      </div>
+    </div>
+
+    <div class="step-item disabled" id="nav-4" onclick="goToStep(4)">
+      <div class="step-num">4</div>
+      <div>
+        <div class="step-label">Repurpose</div>
+        <div class="step-sub">All platform content</div>
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="step-item" id="nav-5" onclick="goToStep(5)">
+      <div class="step-num">↗</div>
+      <div>
+        <div class="step-label">Export All</div>
+        <div class="step-sub">Download everything</div>
+      </div>
+    </div>
+
+    <div class="keyword-display" id="kd" style="display:none">
+      <div class="kd-label">Active Keyword</div>
+      <div class="kd-value" id="kdValue"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main" id="mainContent">
+
+    <!-- STEP 1: KEYWORD INPUT -->
+    <div class="panel active" id="step1">
+      <div class="panel-header">
+        <div class="panel-tag">Step 01</div>
+        <h2>What's your keyword?</h2>
+        <p>Enter 1–3 keywords from your niche. AI will generate 10 high-potential article topics ranked for Medium, SEO traffic, and virality.</p>
+      </div>
+
+      <div id="step1-error" class="error-box hidden"></div>
+
+      <div class="input-group">
+        <input
+          type="text"
+          class="keyword-input"
+          id="keywordInput"
+          placeholder="e.g.  Python  /  React hooks  /  interview questions  /  system design"
+          onkeydown="if(event.key==='Enter') generateTopics()"
+        >
+        <button class="btn btn-primary" id="generateTopicsBtn" onclick="generateTopics()">
+          ⚡ Generate Topics
+        </button>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:28px;">
+        <span style="font-size:12px;color:var(--text3);font-family:'JetBrains Mono',monospace;">Try:</span>
+        <button class="btn-ghost btn" onclick="setKeyword('Python programming')">Python programming</button>
+        <button class="btn-ghost btn" onclick="setKeyword('JavaScript interview')">JavaScript interview</button>
+        <button class="btn-ghost btn" onclick="setKeyword('System design')">System design</button>
+        <button class="btn-ghost btn" onclick="setKeyword('Docker kubernetes')">Docker kubernetes</button>
+        <button class="btn-ghost btn" onclick="setKeyword('Git tips')">Git tips</button>
+      </div>
+
+      <div id="step1-loading" class="loading-box hidden">
+        <div class="spinner"></div>
+        <div class="loading-label">Generating topics<span class="typing-dots"></span></div>
+        <div style="font-size:12px;color:var(--text3);">Analyzing search demand & viral potential</div>
+      </div>
+    </div>
+
+    <!-- STEP 2: TOPIC SELECTION -->
+    <div class="panel" id="step2">
+      <div class="panel-header">
+        <div class="panel-tag">Step 02</div>
+        <h2>Choose your topic</h2>
+        <p id="step2-sub">10 content ideas generated for your keyword. Click one to generate a full SEO article.</p>
+      </div>
+      <div class="flex-gap" style="margin-bottom:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="goToStep(1)">← Change Keyword</button>
+        <button class="btn btn-secondary btn-sm" onclick="regenerateTopics()">↻ Regenerate</button>
+      </div>
+      <div id="topicsGrid" class="topics-grid"></div>
+    </div>
+
+    <!-- STEP 3: ARTICLE -->
+    <div class="panel" id="step3">
+      <div class="panel-header">
+        <div class="panel-tag">Step 03</div>
+        <h2 id="step3-title">Generating article…</h2>
+        <p id="step3-sub">SEO-optimized, Medium-ready article with proper structure and tags.</p>
+      </div>
+      <div id="step3-error" class="error-box hidden"></div>
+
+      <div id="step3-loading" class="loading-box hidden">
+        <div class="spinner"></div>
+        <div class="loading-label">Writing article<span class="typing-dots"></span></div>
+        <div style="font-size:12px;color:var(--text3);">Building SEO structure, examples & flow</div>
+      </div>
+
+      <div id="articleSection" class="hidden">
+        <div class="article-toolbar">
+          <div class="article-toolbar-left">
+            📄 <span id="articleWordCount">0 words</span>
+          </div>
+          <div class="flex-gap">
+            <button class="btn btn-ghost btn-sm" onclick="copyText('articleContent','copy-article')">📋 Copy</button>
+            <button class="btn btn-primary btn-sm" onclick="goToStep(4)">Repurpose All →</button>
+          </div>
+        </div>
+        <div class="article-box" id="articleContent"></div>
+      </div>
+    </div>
+
+    <!-- STEP 4: REPURPOSE -->
+    <div class="panel" id="step4">
+      <div class="panel-header">
+        <div class="panel-tag">Step 04</div>
+        <h2>Repurpose Your Content</h2>
+        <p>Generate platform-specific content from your article. Click each tab to generate.</p>
+      </div>
+      <div class="flex-gap" style="margin-bottom:20px;">
+        <button class="btn btn-secondary btn-sm" onclick="goToStep(3)">← Back to Article</button>
+        <button class="btn btn-primary btn-sm" onclick="generateAll()">⚡ Generate All Platforms</button>
+      </div>
+
+      <!-- Platform Tabs -->
+      <div class="platform-tabs">
+        <div class="ptab active" data-platform="twitter" onclick="switchPlatform('twitter')">🐦 Twitter/X</div>
+        <div class="ptab" data-platform="linkedin" onclick="switchPlatform('linkedin')">💼 LinkedIn</div>
+        <div class="ptab" data-platform="pinterest" onclick="switchPlatform('pinterest')">📌 Pinterest</div>
+        <div class="ptab" data-platform="youtube" onclick="switchPlatform('youtube')">🎥 YouTube</div>
+      </div>
+
+      <!-- TWITTER -->
+      <div class="platform-panel active" id="panel-twitter">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="platform-icon icon-twitter">🐦</div>
+            Twitter / X Content
+          </div>
+          <button class="generate-platform-btn" id="btn-twitter" onclick="generatePlatform('twitter')">
+            ⚡ Generate
+          </button>
+        </div>
+        <div id="loading-twitter" class="loading-box hidden">
+          <div class="spinner"></div>
+          <div class="loading-label">Writing tweets<span class="typing-dots"></span></div>
+        </div>
+        <div class="output-cards" id="output-twitter"></div>
+      </div>
+
+      <!-- LINKEDIN -->
+      <div class="platform-panel" id="panel-linkedin">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="platform-icon icon-linkedin">💼</div>
+            LinkedIn Posts
+          </div>
+          <button class="generate-platform-btn" id="btn-linkedin" onclick="generatePlatform('linkedin')">
+            ⚡ Generate
+          </button>
+        </div>
+        <div id="loading-linkedin" class="loading-box hidden">
+          <div class="spinner"></div>
+          <div class="loading-label">Writing LinkedIn posts<span class="typing-dots"></span></div>
+        </div>
+        <div class="output-cards" id="output-linkedin"></div>
+      </div>
+
+      <!-- PINTEREST -->
+      <div class="platform-panel" id="panel-pinterest">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="platform-icon icon-pinterest">📌</div>
+            Pinterest Pins
+          </div>
+          <button class="generate-platform-btn" id="btn-pinterest" onclick="generatePlatform('pinterest')">
+            ⚡ Generate
+          </button>
+        </div>
+        <div id="loading-pinterest" class="loading-box hidden">
+          <div class="spinner"></div>
+          <div class="loading-label">Creating pins<span class="typing-dots"></span></div>
+        </div>
+        <div id="output-pinterest"></div>
+      </div>
+
+      <!-- YOUTUBE -->
+      <div class="platform-panel" id="panel-youtube">
+        <div class="output-header">
+          <div class="output-title">
+            <div class="platform-icon icon-youtube">🎥</div>
+            YouTube Short Script
+          </div>
+          <button class="generate-platform-btn" id="btn-youtube" onclick="generatePlatform('youtube')">
+            ⚡ Generate
+          </button>
+        </div>
+        <div id="loading-youtube" class="loading-box hidden">
+          <div class="spinner"></div>
+          <div class="loading-label">Writing script<span class="typing-dots"></span></div>
+        </div>
+        <div class="output-cards" id="output-youtube"></div>
+      </div>
+    </div>
+
+    <!-- STEP 5: EXPORT -->
+    <div class="panel" id="step5">
+      <div class="panel-header">
+        <div class="panel-tag">Step 05</div>
+        <h2>Export Everything</h2>
+        <p>Download all your generated content as a single text file, ready to use.</p>
+      </div>
+      <div class="flex-gap">
+        <button class="btn btn-primary" onclick="exportAll()">⬇ Download All Content</button>
+        <button class="btn btn-secondary" onclick="goToStep(1)">🔄 Start New Keyword</button>
+      </div>
+      <div id="exportPreview" style="margin-top:28px;"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal">
+    <h3>⚙ Settings</h3>
+    <p class="modal-sub">Configure your local Ollama connection</p>
+
+    <div class="conn-status" id="connStatus">
+      <div class="status-dot" id="modalStatusDot"></div>
+      <span id="connStatusText">Checking connection…</span>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Ollama API URL</label>
+      <input class="form-input" id="ollamaUrl" value="http://localhost:11434" placeholder="http://localhost:11434">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Model</label>
+      <select class="form-select" id="modelSelect">
+        <option value="llama3.2">llama3.2</option>
+        <option value="llama3.1">llama3.1</option>
+        <option value="llama3">llama3</option>
+        <option value="mistral">mistral</option>
+        <option value="gemma2">gemma2</option>
+        <option value="phi3">phi3</option>
+      </select>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="testConnection()">Test Connection</button>
+      <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ─────────────────────────────────────
+let config = {
+  url: localStorage.getItem('ollama_url') || 'http://localhost:11434',
+  model: localStorage.getItem('ollama_model') || 'llama3.2'
+};
+
+// ─── STATE ───────────────────────────────────────
+let state = {
+  keyword: '',
+  topics: [],
+  selectedTopic: null,
+  article: '',
+  generated: { twitter: false, linkedin: false, pinterest: false, youtube: false }
+};
+
+// ─── INIT ────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('modelName').textContent = config.model;
+  checkConnection();
+});
+
+// ─── CONNECTION ──────────────────────────────────
+async function checkConnection() {
+  const dot = document.getElementById('statusDot');
+  try {
+    const r = await fetch(`${config.url}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      dot.className = 'status-dot connected';
+      return true;
+    }
+  } catch {}
+  dot.className = 'status-dot error';
+  return false;
+}
+
+async function testConnection() {
+  const url = document.getElementById('ollamaUrl').value;
+  const dot = document.getElementById('modalStatusDot');
+  const txt = document.getElementById('connStatusText');
+  dot.className = 'status-dot'; txt.textContent = 'Testing…';
+  try {
+    const r = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(4000) });
+    if (r.ok) {
+      const data = await r.json();
+      const models = data.models?.map(m => m.name).join(', ') || 'unknown';
+      dot.className = 'status-dot connected';
+      txt.textContent = `✓ Connected! Models: ${models}`;
+      return;
+    }
+  } catch (e) {}
+  dot.className = 'status-dot error';
+  txt.textContent = '✗ Cannot connect. Is Ollama running?';
+}
+
+// ─── SETTINGS ────────────────────────────────────
+function openSettings() {
+  document.getElementById('ollamaUrl').value = config.url;
+  document.getElementById('modelSelect').value = config.model;
+  document.getElementById('settingsModal').classList.add('open');
+  testConnection();
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+function saveSettings() {
+  config.url = document.getElementById('ollamaUrl').value.trim();
+  config.model = document.getElementById('modelSelect').value;
+  localStorage.setItem('ollama_url', config.url);
+  localStorage.setItem('ollama_model', config.model);
+  document.getElementById('modelName').textContent = config.model;
+  closeSettings();
+  checkConnection();
+}
+
+// ─── NAVIGATION ──────────────────────────────────
+function goToStep(n) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`step${n}`).classList.add('active');
+  document.querySelectorAll('.step-item').forEach(s => {
+    s.classList.remove('active');
+    const num = parseInt(s.id?.replace('nav-',''));
+    if (num < n && num > 0) { s.classList.add('done'); s.classList.remove('disabled'); }
+    else if (num === n) { s.classList.add('active'); s.classList.remove('disabled'); }
+  });
+  document.getElementById(`nav-${n}`)?.classList.remove('disabled');
+}
+
+// ─── HELPER: OLLAMA STREAM ───────────────────────
+async function ollamaStream(prompt, onChunk, onDone, systemPrompt = '') {
+  const messages = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }]
+    : [{ role: 'user', content: prompt }];
+
+  const resp = await fetch(`${config.url}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: config.model,
+      messages,
+      stream: true,
+      options: { temperature: 0.7, num_predict: 2048 }
+    })
+  });
+
+  if (!resp.ok) throw new Error(`Ollama error: ${resp.status}`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value);
+    const lines = text.split('\n').filter(Boolean);
+    for (const line of lines) {
+      try {
+        const j = JSON.parse(line);
+        if (j.message?.content) {
+          full += j.message.content;
+          onChunk(j.message.content, full);
+        }
+        if (j.done) onDone(full);
+      } catch {}
+    }
+  }
+}
+
+async function ollamaGenerate(prompt, systemPrompt = '') {
+  const resp = await fetch(`${config.url}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: config.model,
+      prompt: systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt,
+      stream: false,
+      options: { temperature: 0.5, num_predict: 1024 }
+    })
+  });
+  if (!resp.ok) throw new Error(`Ollama error: ${resp.status}`);
+  const data = await resp.json();
+  return data.response || '';
+}
+
+// ─── STEP 1: GENERATE TOPICS ─────────────────────
+function setKeyword(k) {
+  document.getElementById('keywordInput').value = k;
+}
+
+async function generateTopics() {
+  const kw = document.getElementById('keywordInput').value.trim();
+  if (!kw) return;
+
+  const errBox = document.getElementById('step1-error');
+  errBox.classList.add('hidden');
+
+  state.keyword = kw;
+  document.getElementById('kdValue').textContent = kw;
+  document.getElementById('kd').style.display = 'block';
+
+  const btn = document.getElementById('generateTopicsBtn');
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  document.getElementById('step1-loading').classList.remove('hidden');
+
+  const prompt = `You are an expert SEO content strategist specializing in tech content for Medium.com.
+
+Given the keyword: "${kw}"
+
+Generate exactly 10 unique, high-potential blog article topics optimized for:
+- Medium.com readers (developers, tech enthusiasts)
+- SEO search demand
+- Viral potential on Twitter and LinkedIn
+
+Return ONLY a valid JSON array, nothing else, no markdown, no explanation:
+[
+  {
+    "title": "article title here",
+    "why": "1 sentence: why this topic works",
+    "difficulty": "easy"
+  }
+]
+
+difficulty must be: easy, medium, or hard
+Make titles specific, actionable, and compelling. No generic titles.`;
+
+  try {
+    const raw = await ollamaGenerate(prompt);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const start = clean.indexOf('[');
+    const end = clean.lastIndexOf(']');
+    const jsonStr = clean.substring(start, end + 1);
+    state.topics = JSON.parse(jsonStr);
+    renderTopics();
+    goToStep(2);
+  } catch (e) {
+    errBox.textContent = `Error: ${e.message}. Make sure Ollama is running at ${config.url}`;
+    errBox.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚡ Generate Topics';
+    document.getElementById('step1-loading').classList.add('hidden');
+  }
+}
+
+async function regenerateTopics() {
+  goToStep(1);
+  document.getElementById('keywordInput').value = state.keyword;
+  await generateTopics();
+}
+
+function renderTopics() {
+  const grid = document.getElementById('topicsGrid');
+  document.getElementById('step2-sub').textContent = `10 content ideas for "${state.keyword}". Click one to generate a full SEO article.`;
+  grid.innerHTML = state.topics.map((t, i) => `
+    <div class="topic-card" onclick="selectTopic(${i})" id="tc-${i}">
+      <div class="topic-num">TOPIC ${String(i+1).padStart(2,'0')}</div>
+      <div class="topic-title">${escHtml(t.title)}</div>
+      <div class="topic-why">${escHtml(t.why)}</div>
+      <span class="topic-badge badge-${t.difficulty}">${t.difficulty}</span>
+    </div>
+  `).join('');
+}
+
+// ─── STEP 2: SELECT & GENERATE ARTICLE ───────────
+async function selectTopic(i) {
+  document.querySelectorAll('.topic-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById(`tc-${i}`).classList.add('selected');
+  state.selectedTopic = state.topics[i];
+
+  goToStep(3);
+  document.getElementById('step3-title').textContent = state.selectedTopic.title;
+  document.getElementById('articleSection').classList.add('hidden');
+  document.getElementById('step3-loading').classList.remove('hidden');
+  document.getElementById('step3-error').classList.add('hidden');
+
+  const prompt = `Write a comprehensive, SEO-optimized article for Medium.com about:
+
+"${state.selectedTopic.title}"
+
+Requirements:
+- Length: 900-1200 words
+- Start with a compelling hook in the introduction
+- Use clear H2 section headings (## Heading)
+- Include 3-5 main sections with practical examples or code snippets
+- Write in a clear, conversational expert voice suitable for developers
+- Add a strong conclusion with key takeaways
+- End with: "Tags: [5 relevant Medium tags]"
+- Optimize naturally for keyword: ${state.keyword}
+
+Write the complete article now:`;
+
+  const content = document.getElementById('articleContent');
+  content.textContent = '';
+  let fullText = '';
+
+  try {
+    await ollamaStream(
+      prompt,
+      (chunk, full) => {
+        fullText = full;
+        content.textContent = full;
+        content.scrollTop = content.scrollHeight;
+        const words = full.trim().split(/\s+/).length;
+        document.getElementById('articleWordCount').textContent = `${words} words`;
+      },
+      (full) => {
+        state.article = full;
+        document.getElementById('step3-loading').classList.add('hidden');
+        document.getElementById('articleSection').classList.remove('hidden');
+      }
+    );
+  } catch (e) {
+    document.getElementById('step3-loading').classList.add('hidden');
+    document.getElementById('step3-error').textContent = `Error: ${e.message}`;
+    document.getElementById('step3-error').classList.remove('hidden');
+  }
+}
+
+// ─── STEP 4: PLATFORM CONTENT ────────────────────
+function switchPlatform(p) {
+  document.querySelectorAll('.ptab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-platform="${p}"]`).classList.add('active');
+  document.querySelectorAll('.platform-panel').forEach(pp => pp.classList.remove('active'));
+  document.getElementById(`panel-${p}`).classList.add('active');
+}
+
+async function generateAll() {
+  for (const p of ['twitter','linkedin','pinterest','youtube']) {
+    switchPlatform(p);
+    await generatePlatform(p);
+  }
+}
+
+async function generatePlatform(platform) {
+  if (!state.article) {
+    alert('Please generate an article first (Step 3)');
+    return;
+  }
+
+  const btn = document.getElementById(`btn-${platform}`);
+  const loading = document.getElementById(`loading-${platform}`);
+  const output = document.getElementById(`output-${platform}`);
+
+  btn.disabled = true;
+  loading.classList.remove('hidden');
+  if (output) output.innerHTML = '';
+
+  const prompts = {
+    twitter: `Based on this article, create Twitter/X content:
+
+ARTICLE:
+${state.article.substring(0, 1500)}
+
+Create exactly 5 tweets + 1 thread. Use this exact format:
+
+TWEET 1 (Hook):
+[tweet text - max 280 chars, curiosity-driven, no hashtags spam]
+
+TWEET 2 (Key Insight):
+[tweet text]
+
+TWEET 3 (Tip/How-to):
+[tweet text]
+
+TWEET 4 (Question/Engagement):
+[tweet asking audience something]
+
+TWEET 5 (CTA):
+[drives to article, 1-2 hashtags]
+
+THREAD (1/7):
+[Full 7-part thread covering the article. Each part labeled 1/7, 2/7 etc.]`,
+
+    linkedin: `Based on this article, create 3 LinkedIn posts:
+
+ARTICLE:
+${state.article.substring(0, 1500)}
+
+Format exactly like this:
+
+POST 1 - STORY FORMAT:
+[Personal angle story post, 150-200 words, use line breaks for readability, end with question]
+
+POST 2 - TIPS LIST:
+[Numbered list of 5-7 tips from the article, 100-150 words, professional tone]
+
+POST 3 - INSIGHT + CTA:
+[Key insight from article, 100-150 words, direct CTA to read full article]`,
+
+    pinterest: `Based on this article, create 5 Pinterest pins:
+
+ARTICLE TITLE: ${state.selectedTopic?.title}
+KEYWORD: ${state.keyword}
+
+ARTICLE SUMMARY:
+${state.article.substring(0, 800)}
+
+Create 5 Pinterest pins with this EXACT format:
+
+PIN 1:
+Headline: [compelling 6-10 word headline]
+Description: [80-120 chars SEO description starting with main keyword, ending with #hashtag1 #hashtag2 #hashtag3]
+Keywords: [5 comma-separated search keywords]
+
+PIN 2:
+Headline: [different angle headline]
+Description: [different description]
+Keywords: [5 keywords]
+
+PIN 3:
+Headline: [beginner-focused headline]
+Description: [description]
+Keywords: [5 keywords]
+
+PIN 4:
+Headline: [how-to style headline]
+Description: [description]
+Keywords: [5 keywords]
+
+PIN 5:
+Headline: [list/number headline]
+Description: [description]
+Keywords: [5 keywords]`,
+
+    youtube: `Based on this article, write a YouTube Shorts script (60 seconds):
+
+ARTICLE TITLE: ${state.selectedTopic?.title}
+ARTICLE: ${state.article.substring(0, 1000)}
+
+Write a complete script in this format:
+
+VIDEO TITLE:
+[SEO-optimized YouTube title, 60 chars max]
+
+DESCRIPTION:
+[150-200 char YouTube description with 5 hashtags]
+
+HOOK (0-3 seconds):
+[Shocking stat or question to stop scrolling]
+
+PROBLEM (3-10 seconds):
+[Pain point the viewer relates to]
+
+SOLUTION (10-45 seconds):
+[3 key points from article, one per 10-12 seconds]
+
+CTA (45-60 seconds):
+[Call to action - like, follow, comment]
+
+ON-SCREEN TEXT:
+[List of text overlays for the video editor]
+
+TAGS:
+[10 YouTube tags comma-separated]`
+  };
+
+  try {
+    const result = await ollamaGenerate(prompts[platform]);
+    renderPlatformOutput(platform, result);
+    state.generated[platform] = true;
+    document.querySelector(`[data-platform="${platform}"]`).classList.add('done');
+  } catch (e) {
+    if (output) output.innerHTML = `<div class="error-box">${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    loading.classList.add('hidden');
+  }
+}
+
+function renderPlatformOutput(platform, raw) {
+  if (platform === 'twitter') renderTwitter(raw);
+  else if (platform === 'linkedin') renderLinkedIn(raw);
+  else if (platform === 'pinterest') renderPinterest(raw);
+  else if (platform === 'youtube') renderYouTube(raw);
+}
+
+function renderTwitter(raw) {
+  const container = document.getElementById('output-twitter');
+  const sections = raw.split(/\n(?=TWEET \d|THREAD)/g).filter(Boolean);
+  container.innerHTML = sections.map((section, i) => {
+    const isThread = section.startsWith('THREAD');
+    const label = isThread ? 'THREAD' : `TWEET ${i+1}`;
+    const content = section.replace(/^TWEET \d+[^:]*:\n?|^THREAD[^:]*:\n?/,'').trim();
+    const id = `tw-${i}`;
+    return `<div class="output-card">
+      <div class="output-card-header">
+        <div class="output-card-label">${label}</div>
+        <button class="copy-btn" id="copy-${id}" onclick="copyText('body-${id}','copy-${id}')">📋 Copy</button>
+      </div>
+      <div class="output-card-body" id="body-${id}">${escHtml(content)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderLinkedIn(raw) {
+  const container = document.getElementById('output-linkedin');
+  const sections = raw.split(/\n(?=POST \d)/g).filter(Boolean);
+  container.innerHTML = sections.map((section, i) => {
+    const label = `LINKEDIN POST ${i+1}`;
+    const content = section.replace(/^POST \d+[^:]*:\n?/,'').trim();
+    const id = `li-${i}`;
+    return `<div class="output-card">
+      <div class="output-card-header">
+        <div class="output-card-label">${label}</div>
+        <button class="copy-btn" id="copy-${id}" onclick="copyText('body-${id}','copy-${id}')">📋 Copy</button>
+      </div>
+      <div class="output-card-body" id="body-${id}">${escHtml(content)}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPinterest(raw) {
+  const container = document.getElementById('output-pinterest');
+  const pins = raw.split(/\n(?=PIN \d)/g).filter(s => s.trim());
+  const html = `<div class="pin-grid">` + pins.map((pin, i) => {
+    const id = `pin-${i}`;
+    const headlineMatch = pin.match(/Headline:\s*(.+)/i);
+    const descMatch = pin.match(/Description:\s*(.+)/i);
+    const kwMatch = pin.match(/Keywords?:\s*(.+)/i);
+    const headline = headlineMatch ? headlineMatch[1].trim() : '';
+    const desc = descMatch ? descMatch[1].trim() : '';
+    const kws = kwMatch ? kwMatch[1].trim() : '';
+    const copyText = `Headline: ${headline}\nDescription: ${desc}\nKeywords: ${kws}`;
+    return `<div class="pin-item">
+      <div class="pin-header">
+        <span class="pin-num">📌 PIN ${i+1}</span>
+        <button class="copy-btn" id="copy-${id}" onclick="copyRaw('${id}', \`${copyText.replace(/`/g,'\\`')}\`)">📋</button>
+      </div>
+      <div class="pin-body">
+        <div class="pin-section">
+          <div class="pin-section-label">Headline</div>
+          <strong style="color:var(--text)">${escHtml(headline)}</strong>
+        </div>
+        <div class="pin-section">
+          <div class="pin-section-label">SEO Description</div>
+          <div style="color:var(--text2)">${escHtml(desc)}</div>
+        </div>
+        <div class="pin-section">
+          <div class="pin-section-label">Keywords</div>
+          <div style="color:var(--amber);font-size:11px;font-family:'JetBrains Mono',monospace">${escHtml(kws)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('') + `</div>`;
+  container.innerHTML = html;
+}
+
+function renderYouTube(raw) {
+  const container = document.getElementById('output-youtube');
+  const sections = ['VIDEO TITLE','DESCRIPTION','HOOK','PROBLEM','SOLUTION','CTA','ON-SCREEN TEXT','TAGS'];
+  const parts = [];
+  for (let i = 0; i < sections.length; i++) {
+    const s = sections[i];
+    const next = sections[i+1];
+    const start = raw.indexOf(s+':');
+    if (start === -1) continue;
+    const end = next ? raw.indexOf(next+':', start + s.length) : raw.length;
+    const content = raw.substring(start + s.length + 1, end === -1 ? raw.length : end).trim();
+    parts.push({ label: s, content });
+  }
+  if (!parts.length) {
+    container.innerHTML = `<div class="output-card"><div class="output-card-body">${escHtml(raw)}</div></div>`;
+    return;
+  }
+  container.innerHTML = parts.map((p, i) => {
+    const id = `yt-${i}`;
+    return `<div class="output-card">
+      <div class="output-card-header">
+        <div class="output-card-label">${p.label}</div>
+        <button class="copy-btn" id="copy-${id}" onclick="copyText('body-${id}','copy-${id}')">📋 Copy</button>
+      </div>
+      <div class="output-card-body" id="body-${id}">${escHtml(p.content)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── EXPORT ──────────────────────────────────────
+function exportAll() {
+  const lines = [
+    `CONTENT ENGINE EXPORT`,
+    `Generated: ${new Date().toLocaleString()}`,
+    `Keyword: ${state.keyword}`,
+    `Topic: ${state.selectedTopic?.title || ''}`,
+    `${'='.repeat(60)}`,
+    '',
+    '## ARTICLE',
+    state.article,
+    '',
+  ];
+
+  ['twitter','linkedin','pinterest','youtube'].forEach(p => {
+    const el = document.getElementById(`output-${p}`);
+    if (el?.textContent?.trim()) {
+      lines.push(`${'='.repeat(60)}`);
+      lines.push(`## ${p.toUpperCase()} CONTENT`);
+      lines.push(el.textContent.trim());
+      lines.push('');
+    }
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `content-${state.keyword.replace(/\s+/g,'-')}-${Date.now()}.txt`;
+  a.click();
+
+  document.getElementById('exportPreview').innerHTML = `
+    <div style="padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--green)">
+      ✓ Downloaded! File: content-${state.keyword.replace(/\s+/g,'-')}.txt
+    </div>`;
+}
+
+// ─── UTILITIES ────────────────────────────────────
+function copyText(elId, btnId) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent || el.innerText).then(() => {
+    const btn = document.getElementById(btnId);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓ Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+    }
+  });
+}
+
+function copyRaw(btnId, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById(`copy-${btnId}`);
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '✓';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+    }
+  });
+}
+
+function escHtml(s = '') {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
