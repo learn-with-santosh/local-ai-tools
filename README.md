@@ -12,11 +12,11 @@
 
 ## 🧰 Tools Available
 
-| # | Tool | Description | Demo |
-|---|------|-------------|------|
-| 01 | [Content Engine](#-01-content-engine) | Keyword → SEO Article → 14+ platform content pieces | [Try it →](https://santoshshelar.github.io/local-ai-tools/content-engine/) |
-| 02 | *Coming soon* | — | — |
-| 03 | *Coming soon* | — | — |
+| # | Tool | Description |
+|---|------|-------------|
+| 01 | [Content Engine](#-01-content-engine) | Keyword → SEO Article → 14+ platform content pieces |
+| 02 | *Coming soon* | — |
+| 03 | *Coming soon* | — |
 
 ---
 
@@ -107,11 +107,11 @@ That's it. No npm install. No pip install. No `.env` file.
 
 ### Article published on Medium
 
-📖 [I Built a Free AI Content Engine Using Ollama — No API Keys, No Monthly Bills](https://medium.com/@santoshshelar)
+📖 [How I Turned 1 Post into 14 Pieces of Content? (And It Cost Me $0)](https://medium.com/@santoshshelar/how-i-turned-1-post-into-14-pieces-of-content-and-it-cost-me-0-ff4f6b810138)
 
 ---
 
-## 🚀 Philosophy
+## 🚀 Philosophy    
 
 Most AI tools today follow the same model:
 
