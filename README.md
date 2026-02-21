@@ -147,11 +147,11 @@ local-ai-tools/
 │
 ├── content-engine/
 │   ├── index.html        ← full tool, single file
-│   └── README.md         ← tool-specific docs
+│   
 │
 └── [future-tool]/
     ├── index.html
-    └── README.md
+    
 ```
 
 ---
@@ -172,7 +172,7 @@ Contributions welcome! If you build a tool using Ollama that fits the philosophy
 Built by **Santosh Shelar** — developer, creator, and believer in tools that work without a credit card.
 
 - 🌐 Website: [santoshshelar.com](https://santoshshelar.com)
-- 🛠 Tools: [calculatejunction.com](https://calculatejunction.com)
+- 🛠 Tools: [calculatejunction.com](https://calculatorjunction.in/)
 - 🐦 Twitter/X: [@LearnWithSantosh](https://x.com/learn_with_san)
 - 💼 LinkedIn: [Santosh Shelar](https://www.linkedin.com/in/santosh-shelar-20731061)
 - ✍️ Medium: [@santoshshelar](https://medium.com/@santoshshelar)
