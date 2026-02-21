@@ -14,7 +14,7 @@
 
 | # | Tool | Description |
 |---|------|-------------|
-| 01 | [Content Engine](#-01-content-engine) | Keyword → SEO Article → 14+ platform content pieces |
+| 01 | [Content Engine](https://github.com/learn-with-santosh/local-ai-tools/tree/main/content-engine) | Keyword → SEO Article → 14+ platform content pieces |
 | 02 | *Coming soon* | — |
 | 03 | *Coming soon* | — |
 
